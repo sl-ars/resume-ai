@@ -1,0 +1,67 @@
+# ---------------------------
+# Python / Django backend
+# ---------------------------
+__pycache__/
+*.py[co]
+*.egg-info/
+*.log
+*.pot
+*.mo
+*.sqlite3
+db.sqlite3
+.env.local
+.env.docker
+.env
+*.bak
+
+# Build artifacts
+build/
+dist/
+wheels/
+
+# Virtual environments
+.venv/
+.uv/
+
+# VSCode settings
+.vscode/
+
+# Migrations
+*/migrations/__pycache__/
+*/migrations/*.pyc
+# uncomment next if you want to ignore all migrations
+# */migrations/
+
+# pytest cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Django stuff
+media/
+static/
+local_settings.py
+
+# ---------------------------
+# Node.js / React frontend
+# ---------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+
+# Vite
+.vite/
+
+# Env files
+frontend/.env
+backend/.env.docker
+
+# JETBRAINS IDE
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

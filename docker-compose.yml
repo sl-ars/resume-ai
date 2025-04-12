@@ -1,0 +1,126 @@
+
+
+services:
+  # PostgreSQL service for users and jobs data
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-resume_ai_db}
+      POSTGRES_USER: ${POSTGRES_USER:-resume_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-resume_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-resume_user} -d ${POSTGRES_DB:-resume_ai_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB service for resumes data
+  mongodb:
+    image: mongo:7.0
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGODB_DB:-resume_ai_mongodb}
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - "${MONGODB_PORT:-27017}:27017"
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/${MONGODB_DB:-resume_ai_mongodb} --quiet
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MySQL service for analytics data
+  mysql:
+    image: mysql:8.3
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DB:-resume_ai_mysql}
+      MYSQL_USER: ${MYSQL_USER:-resume_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-resume_pass}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USER:-resume_user}", "-p${MYSQL_PASSWORD:-resume_pass}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and message queue
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Backend service - Django API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DJANGO_ENV=${DJANGO_ENV:-prod}
+      - SECRET_KEY=${SECRET_KEY:-change_this_in_production}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,backend}
+      - POSTGRES_DB=${POSTGRES_DB:-resume_ai_db}
+      - POSTGRES_USER=${POSTGRES_USER:-resume_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-resume_pass}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - MONGODB_HOST=mongodb://mongodb:27017/
+      - MONGODB_DB=${MONGODB_DB:-resume_ai_mongodb}
+      - MYSQL_DB=${MYSQL_DB:-resume_ai_mysql}
+      - MYSQL_USER=${MYSQL_USER:-resume_user}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-resume_pass}
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - backend_static:/app/staticfiles
+      - backend_media:/app/media
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+
+  # Frontend service - React with Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    volumes:
+      - backend_static:/usr/share/nginx/html/static
+      - backend_media:/usr/share/nginx/html/media
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  mysql_data:
+  redis_data:
+  backend_static:
+  backend_media: 
