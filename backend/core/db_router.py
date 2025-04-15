@@ -1,94 +1,61 @@
 class MultiDBRouter:
     """
-    Database router that routes queries to the appropriate database based on app label.
-    
-    - PostgreSQL: users, jobs, auth, admin, contenttypes, sessions
-    - MongoDB: resumes (handled directly via pymongo, not through Django ORM)
-    - MySQL: analytics
+    Database router that routes models to the appropriate database based on the app label.
+
+    - PostgreSQL (default): users, jobs, resumes, auth, admin, contenttypes, sessions
+    - MySQL: analytics (logs)
+    - MongoDB is handled separately via pymongo, not through Django ORM.
     """
-    
+
+    postgresql_apps = {'auth', 'admin', 'contenttypes', 'sessions', 'users', 'jobs', 'resumes'}
+    mysql_apps = {'analytics'}
+
     def db_for_read(self, model, **hints):
         """
         Route read operations to the appropriate database.
         """
         app_label = model._meta.app_label
-        
-        # Django system apps use default database
-        if app_label in ['auth', 'admin', 'contenttypes', 'sessions']:
+
+        if app_label in self.postgresql_apps:
             return 'default'
-            
-        # Business apps routing
-        if app_label in ['users', 'jobs']:
-            return 'default'  # PostgreSQL
-        elif app_label == 'resumes':
-            # Only route Django ORM models in resumes app to default
-            # MongoDB models are handled directly through pymongo
-            return 'default'
-        elif app_label == 'analytics':
+        elif app_label in self.mysql_apps:
             return 'mysql'
-            
-        return 'default'
-    
+        return None
+
     def db_for_write(self, model, **hints):
         """
         Route write operations to the appropriate database.
         """
         app_label = model._meta.app_label
-        
-        # Django system apps use default database
-        if app_label in ['auth', 'admin', 'contenttypes', 'sessions']:
+
+        if app_label in self.postgresql_apps:
             return 'default'
-            
-        # Business apps routing
-        if app_label in ['users', 'jobs']:
-            return 'default'  # PostgreSQL
-        elif app_label == 'resumes':
-            # Only route Django ORM models in resumes app to default
-            # MongoDB models are handled directly through pymongo
-            return 'default'
-        elif app_label == 'analytics':
+        elif app_label in self.mysql_apps:
             return 'mysql'
-            
-        return 'default'
-    
+        return None
+
     def allow_relation(self, obj1, obj2, **hints):
         """
-        Allow relations between objects in the same database or 
-        between objects in default database and any other.
+        Allow relations if both objects are from allowed apps.
         """
-        # Always allow relations within the same app
-        if obj1._meta.app_label == obj2._meta.app_label:
+        app_label1 = obj1._meta.app_label
+        app_label2 = obj2._meta.app_label
+
+        if app_label1 == app_label2:
             return True
-            
-        # Allow relations between Django system apps and other apps
-        # This is critical for auth permissions and content types
-        if obj1._meta.app_label in ['auth', 'contenttypes'] or obj2._meta.app_label in ['auth', 'contenttypes']:
+
+        if app_label1 in (self.postgresql_apps | self.mysql_apps) and app_label2 in (
+                self.postgresql_apps | self.mysql_apps):
             return True
-            
-        # Allow relations between our defined apps
-        allowed_apps = ['users', 'jobs', 'resumes', 'analytics']
-        if obj1._meta.app_label in allowed_apps and obj2._meta.app_label in allowed_apps:
-            return True
-            
-        return False
-    
+
+        return None
+
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         """
-        Control which database migrations should run on.
+        Ensure migrations occur on the correct database.
         """
-        # All Django system apps should migrate on default database
-        if app_label in ['auth', 'admin', 'contenttypes', 'sessions']:
+        if app_label in self.postgresql_apps:
             return db == 'default'
-            
-        # Route migrations based on app
-        if db == 'default' and app_label in ['users', 'jobs']:
-            return True
-        elif db == 'default' and app_label == 'resumes':
-            # Allow all resumes models to migrate on default database
-            # since MongoDB is handled directly via pymongo
-            return True
-        elif db == 'mysql' and app_label == 'analytics':
-            return True
-            
-        # Prevent migrations on non-matching databases
-        return False 
+        elif app_label in self.mysql_apps:
+            return db == 'mysql'
+        return None

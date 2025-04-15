@@ -1,48 +1,65 @@
 """
-MongoDB connection utility for direct access to MongoDB using pymongo.
+MongoDB connection utility for centralized and efficient access using pymongo.
+Production-ready version.
 """
 
-import os
 from pymongo import MongoClient
+from bson.codec_options import UuidRepresentation
 from django.conf import settings
+import os
 
 
-def get_mongodb_client():
+class MongoDBClient:
     """
-    Get MongoDB client instance.
-    
-    Returns:
-        pymongo.MongoClient: MongoDB client instance.
+    Singleton class for managing MongoDB client and database connections.
     """
-    # Get settings from Django or environment variables
-    uri = getattr(settings, 'MONGODB_URI', os.environ.get('MONGODB_HOST', 'mongodb://localhost:27017/'))
-    ssl = getattr(settings, 'MONGODB_SSL', False)
-    
-    # Create MongoDB client with options
-    return MongoClient(uri, ssl=ssl)
 
+    _client = None
+    _db = None
 
-def get_mongodb_database():
-    """
-    Get MongoDB database instance.
-    
-    Returns:
-        pymongo.database.Database: MongoDB database instance.
-    """
-    client = get_mongodb_client()
-    db_name = getattr(settings, 'MONGODB_DB', os.environ.get('MONGODB_DB', 'resume_ai_mongodb'))
-    return client[db_name]
+    @classmethod
+    def get_client(cls) -> MongoClient:
+        """
+        Get or create a MongoClient instance.
 
+        Returns:
+            MongoClient: Active MongoDB client.
+        """
+        if cls._client is None:
+            uri = getattr(settings, 'MONGODB_URI', os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/'))
+            ssl = getattr(settings, 'MONGODB_SSL', False)
 
-def get_mongodb_collection(collection_name):
-    """
-    Get MongoDB collection by name.
-    
-    Args:
-        collection_name (str): Name of the collection.
-        
-    Returns:
-        pymongo.collection.Collection: MongoDB collection.
-    """
-    db = get_mongodb_database()
-    return db[collection_name] 
+            cls._client = MongoClient(
+                uri,
+                ssl=ssl,
+                uuidRepresentation='standard',
+                serverSelectionTimeoutMS=5000  # Fail fast if server not reachable
+            )
+        return cls._client
+
+    @classmethod
+    def get_db(cls):
+        """
+        Get or create the MongoDB database instance.
+
+        Returns:
+            Database: MongoDB database object.
+        """
+        if cls._db is None:
+            db_name = getattr(settings, 'MONGODB_DB', os.environ.get('MONGODB_DB', 'resume_ai_mongodb'))
+            cls._db = cls.get_client()[db_name]
+        return cls._db
+
+    @classmethod
+    def get_collection(cls, collection_name: str):
+        """
+        Get a specific collection from the database.
+
+        Args:
+            collection_name (str): Name of the MongoDB collection.
+
+        Returns:
+            Collection: MongoDB collection object.
+        """
+        db = cls.get_db()
+        return db[collection_name]

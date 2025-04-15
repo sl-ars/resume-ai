@@ -1,22 +1,40 @@
-"""
-URL configuration for resume_ai project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
+
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularSwaggerView,
+    SpectacularRedocView,
+)
+
+from rest_framework_simplejwt.views import TokenRefreshView
+from users.views import CustomTokenObtainPairView, UserViewSet
 
 urlpatterns = [
+    # Admin interface
     path('admin/', admin.site.urls),
+
+    # API Documentation
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+
+    # Authentication
+    path('api/auth/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/auth/register/', UserViewSet.as_view({'post': 'create'}), name='register'),
+    path('api/auth/verify-email/', UserViewSet.as_view({'post': 'verify_email'}), name='verify_email'),
+    path('api/auth/request-password-reset/', UserViewSet.as_view({'post': 'request_password_reset'}), name='request_password_reset'),
+    path('api/auth/reset-password/', UserViewSet.as_view({'post': 'reset_password'}), name='reset_password'),
+
+    # Application endpoints
+    path('api/', include('users.urls')),
+    path('api/', include('resumes.urls')),
+    #path('api/', include('jobs.urls')),
 ]
+
+# Serve media files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
