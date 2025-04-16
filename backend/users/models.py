@@ -67,6 +67,15 @@ class User(AbstractUser):
     
     def __str__(self):
         return self.email
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+
+            old = User.objects.get(pk=self.pk)
+            if old.email != self.email:
+
+                self.is_email_verified = False
+        super().save(*args, **kwargs)
     
     @property
     def is_job_seeker(self):

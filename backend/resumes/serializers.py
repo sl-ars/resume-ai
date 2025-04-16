@@ -8,7 +8,7 @@ class ResumeListSerializer(serializers.ModelSerializer):
         model = Resume
         fields = ['id', 'title', 'file_type', 'status', 'visibility', 'created_at', 'updated_at', 'overall_score']
 
-    def get_overall_score(self, obj):
+    def get_overall_score(self, obj) -> float | None:
         from resumes.mongo.storage import get_resume_analysis_by_resume_id
         analysis = get_resume_analysis_by_resume_id(str(obj.id))
         if analysis:

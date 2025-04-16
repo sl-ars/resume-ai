@@ -10,7 +10,8 @@ from drf_spectacular.views import (
 )
 
 from rest_framework_simplejwt.views import TokenRefreshView
-from users.views import CustomTokenObtainPairView, UserViewSet
+from users.views import CustomTokenObtainPairView, UserViewSet, CustomTokenRefreshView
+
 
 urlpatterns = [
     # Admin interface
@@ -23,16 +24,13 @@ urlpatterns = [
 
     # Authentication
     path('api/auth/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/auth/register/', UserViewSet.as_view({'post': 'create'}), name='register'),
-    path('api/auth/verify-email/', UserViewSet.as_view({'post': 'verify_email'}), name='verify_email'),
-    path('api/auth/request-password-reset/', UserViewSet.as_view({'post': 'request_password_reset'}), name='request_password_reset'),
-    path('api/auth/reset-password/', UserViewSet.as_view({'post': 'reset_password'}), name='reset_password'),
+    path('api/auth/token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
 
     # Application endpoints
-    path('api/', include('users.urls')),
-    path('api/', include('resumes.urls')),
-    #path('api/', include('jobs.urls')),
+    path('api/user/', include('users.urls')),
+    path('api/resumes/', include('resumes.urls')),
+    path('api/jobs/', include('jobs.urls')),
+    path('api/analytics/', include('analytics.urls')),
 ]
 
 # Serve media files in development

@@ -121,10 +121,11 @@ class ProfileSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(source='user.first_name')
     last_name = serializers.CharField(source='user.last_name')
     role = serializers.CharField(source='user.role', read_only=True)
+    is_email_verified = serializers.BooleanField(source='user.is_email_verified',read_only=True)
     
     class Meta:
         model = Profile
-        fields = ('id', 'email', 'first_name', 'last_name', 'role',
+        fields = ('id', 'email', 'first_name', 'last_name', 'role', 'is_email_verified',
                  'bio', 'location', 'phone_number', 'website', 
                  'linkedin_url', 'github_url', 'profile_picture')
     
@@ -140,4 +141,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         user.save()
         
         # Update profile data
-        return super().update(instance, validated_data) 
+        return super().update(instance, validated_data)
+
+class ResendVerificationEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()

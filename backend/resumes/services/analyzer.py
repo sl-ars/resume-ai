@@ -1,11 +1,20 @@
 """
-Service for analyzing parsed resumes and storing analysis results.
+Service for analyzing parsed resumes and storing analysis results using NLTK.
 """
 
 import logging
 import re
 from typing import List, Tuple, Optional
 from uuid import UUID
+
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.probability import FreqDist
+
+import os
+
+nltk_data_path = os.path.join(os.path.dirname(__file__), '..', '..', 'nltk_data')
+nltk.data.path.append(os.path.abspath(nltk_data_path))
 
 from resumes.models import Resume
 from resumes.mongo.storage import insert_resume_analysis, get_resume_content_by_resume_id
@@ -16,9 +25,6 @@ from analytics.models import LogEntry
 logger = logging.getLogger(__name__)
 
 def fix_resume_content_data(data: dict) -> dict:
-    """
-    Ensure correct types for resume content before parsing.
-    """
     if "resume_id" in data and not isinstance(data["resume_id"], UUID):
         try:
             data["resume_id"] = UUID(data["resume_id"])
@@ -38,18 +44,27 @@ class ResumeAnalysisService:
     """
 
     @staticmethod
+    def extract_keywords(raw_text: str) -> List[str]:
+        tokens = word_tokenize(raw_text.lower())
+        freq = FreqDist(tokens)
+        keywords = [word for word, count in freq.most_common(20) if len(word) > 2]
+        return keywords
+
+    @staticmethod
     def analyze_content_quality(raw_text: str) -> Tuple[float, List[str], List[str]]:
         strengths = []
         weaknesses = []
 
-        word_count = len(raw_text.split())
+        tokens = word_tokenize(raw_text)
+        word_count = len(tokens)
 
         if word_count >= 300:
             strengths.append("Resume has sufficient length.")
         else:
             weaknesses.append("Resume is too short. Aim for at least 300 words.")
 
-        if "summary" in raw_text.lower() or "objective" in raw_text.lower():
+        keywords = ResumeAnalysisService.extract_keywords(raw_text)
+        if any(word in keywords for word in ["summary", "objective"]):
             strengths.append("Resume includes a summary or objective section.")
         else:
             weaknesses.append("Consider adding a summary or objective section.")
@@ -110,9 +125,6 @@ class ResumeAnalysisService:
 
     @classmethod
     def analyze_resume(cls, resume_id: str) -> Optional[str]:
-        """
-        Perform complete analysis of a resume and save the results.
-        """
         try:
             resume = Resume.objects.get(id=resume_id)
 
@@ -134,10 +146,10 @@ class ResumeAnalysisService:
             weaknesses = content_weaknesses + formatting_weaknesses + ats_weaknesses
 
             improvement_suggestions = [f"Improve: {weak}" for weak in weaknesses[:5]]
-            
+
             analysis = ResumeAnalysis(
                 resume_id=resume.id,
-                user_id=resume.user.id,  # Store user_id as integer
+                user_id=resume.user.id,
                 overall_score=overall_score,
                 content_score=content_score,
                 formatting_score=formatting_score,

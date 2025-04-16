@@ -1,154 +1,256 @@
-from django.shortcuts import render
-from rest_framework import status, viewsets, permissions, generics
+from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework_simplejwt.views import TokenObtainPairView
-from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
-
-from .models import User, Profile
-from .serializers import (
-    CustomTokenObtainPairSerializer, UserSerializer, 
-    RegisterSerializer, PasswordResetRequestSerializer, 
-    PasswordResetConfirmSerializer, EmailVerificationSerializer,
-    ProfileSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import IsAuthenticated
+from users.models import User, Profile
+from users.serializers import (
+    UserSerializer,
+    RegisterSerializer,
+    PasswordResetRequestSerializer,
+    PasswordResetConfirmSerializer,
+    EmailVerificationSerializer,
+    ProfileSerializer,
+    CustomTokenObtainPairSerializer, ResendVerificationEmailSerializer,
 )
-from .services import PasswordResetService, EmailVerificationService
+from users.services import PasswordResetService, EmailVerificationService
+from core.mixins.response import BaseResponseMixin
+from core.serializers.response import SuccessResponseSerializer, ErrorResponseSerializer
+from rest_framework.exceptions import MethodNotAllowed
+
+common_responses = {
+    200: SuccessResponseSerializer,
+    201: SuccessResponseSerializer,
+    400: ErrorResponseSerializer,
+    401: ErrorResponseSerializer,
+    403: ErrorResponseSerializer,
+    404: ErrorResponseSerializer,
+    500: ErrorResponseSerializer,
+}
 
 
+@extend_schema(tags=["Auth"])
 class CustomTokenObtainPairView(TokenObtainPairView):
-    """Custom token obtain view that uses the custom token serializer"""
     serializer_class = CustomTokenObtainPairSerializer
 
 
-class UserViewSet(viewsets.ModelViewSet):
-    """ViewSet for user management"""
+@extend_schema(tags=["Auth"])
+class CustomTokenRefreshView(TokenRefreshView):
+    pass
+
+
+@extend_schema(tags=["Users"])
+class UserViewSet(BaseResponseMixin, viewsets.ModelViewSet):
+    """
+    ViewSet for user registration, email verification and password reset.
+    """
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    
+
     def get_permissions(self):
-        """Define permissions based on action"""
-        if self.action == 'create':
-            permission_classes = [permissions.AllowAny]
+        if self.action in ['create', 'verify_email', 'request_email_verification', 'request_password_reset', 'reset_password', 'resend_verification_email']:
+            return [permissions.AllowAny()]
         elif self.action in ['retrieve', 'update', 'partial_update']:
-            permission_classes = [permissions.IsAuthenticated]
-        else:
-            permission_classes = [permissions.IsAdminUser]
-        return [permission() for permission in permission_classes]
-        
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAdminUser()]
+
     def get_serializer_class(self):
-        """Return appropriate serializer based on action"""
         if self.action == 'create':
             return RegisterSerializer
         return super().get_serializer_class()
-    
+
+
     def create(self, request, *args, **kwargs):
-        """Register a new user"""
+        """
+        Disable the default create method. Registration handled via /auth/register/.
+        """
+        raise MethodNotAllowed("POST")
+
+    @extend_schema(
+        request=RegisterSerializer,
+        responses={**common_responses, 201: SuccessResponseSerializer},
+        description="Register a new user account."
+    )
+    @action(detail=False, methods=['post'], url_path='register')
+    def register(self, request, *args, **kwargs):  # <-- не create!
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        
-        # Send email verification
+
         EmailVerificationService.send_verification_email(user)
-        
-        # Return user data
-        return Response({
-            'user': UserSerializer(user).data,
-            'message': 'User registered successfully. Please check your email to verify your account.'
-        }, status=status.HTTP_201_CREATED)
-    
+
+        return self.success({
+            "user": UserSerializer(user).data,
+            "message": "User registered successfully. Please verify your email."
+        }, status_code=status.HTTP_201_CREATED)
+
+
     @extend_schema(
         request=EmailVerificationSerializer,
-        responses={
-            200: OpenApiResponse(description="Email verified successfully"),
-            400: OpenApiResponse(description="Invalid verification token")
-        }
+        responses=common_responses,
+        description="Verify email address using uid and token."
     )
-    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    @action(detail=False, methods=['post'], url_path='verify-email')
     def verify_email(self, request):
-        """Verify user email"""
         serializer = EmailVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         uid = serializer.validated_data['uid']
         token = serializer.validated_data['token']
-        
+
         user = EmailVerificationService.verify_token(uid, token)
         if user:
             user.is_email_verified = True
             user.save()
-            return Response({'message': 'Email verified successfully'}, status=status.HTTP_200_OK)
-        
-        return Response({'error': 'Invalid verification link'}, status=status.HTTP_400_BAD_REQUEST)
-    
+            return self.success({"message": "Email verified successfully."})
+
+        return self.error("Invalid or expired verification token.")
+
     @extend_schema(
         request=PasswordResetRequestSerializer,
-        responses={
-            200: OpenApiResponse(description="Password reset email sent"),
-            400: OpenApiResponse(description="User not found")
-        }
+        responses=common_responses,
+        description="Request password reset email."
     )
-    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    @action(detail=False, methods=['post'], url_path='request-password-reset')
     def request_password_reset(self, request):
-        """Request password reset"""
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         email = serializer.validated_data['email']
+
         try:
             user = User.objects.get(email=email)
             PasswordResetService.send_password_reset_email(user)
-            return Response({'message': 'Password reset email sent'}, status=status.HTTP_200_OK)
+            return self.success({"message": "Password reset email sent."})
         except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=status.HTTP_400_BAD_REQUEST)
-    
+            return self.error("User not found.")
+
     @extend_schema(
         request=PasswordResetConfirmSerializer,
-        responses={
-            200: OpenApiResponse(description="Password reset successful"),
-            400: OpenApiResponse(description="Invalid reset token")
-        }
+        responses=common_responses,
+        description="Confirm new password after reset."
     )
-    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    @action(detail=False, methods=['post'], url_path='reset-password')
     def reset_password(self, request):
-        """Reset user password"""
         serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         uid = serializer.validated_data['uid']
         token = serializer.validated_data['token']
         password = serializer.validated_data['password']
-        
+
         user = PasswordResetService.verify_token(uid, token)
         if user:
             user.set_password(password)
             user.save()
-            return Response({'message': 'Password reset successful'}, status=status.HTTP_200_OK)
-        
-        return Response({'error': 'Invalid reset token'}, status=status.HTTP_400_BAD_REQUEST)
+            return self.success({"message": "Password reset successful."})
+
+        return self.error("Invalid or expired reset token.")
+
+    @extend_schema(
+        request=PasswordResetRequestSerializer,
+        responses=common_responses,
+        description="Request email verification link again."
+    )
+    @action(detail=False, methods=['post'], url_path='request-email-verification')
+    def request_email_verification(self, request):
+        """
+        Request sending email verification link again to the user.
+        """
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data['email']
+
+        try:
+            user = User.objects.get(email=email)
+            if user.is_email_verified:
+                return self.error("Email already verified.", status.HTTP_400_BAD_REQUEST)
+
+            EmailVerificationService.send_verification_email(user)
+            return self.success({"message": "Verification email sent."})
+        except User.DoesNotExist:
+            return self.error("User not found.")
+
+    @extend_schema(
+        responses=common_responses,
+        description="Resend email verification link."
+    )
+    @action(detail=False, methods=['post'], url_path='resend-verification-email')
+    def resend_verification_email(self, request, *args, **kwargs):
+
+        try:
+            user = request.user
 
 
-class ProfileViewSet(viewsets.ModelViewSet):
-    """ViewSet for user profile"""
-    serializer_class = ProfileSerializer
+            if user.is_email_verified:
+                return self.success(
+                    {"message": "Your email is already verified."}
+                )
+
+            EmailVerificationService.send_verification_email(user)
+
+
+
+            return self.success({"message": "Verification email sent."}
+
+
+            )
+        except User.DoesNotExist:
+            return self.error(
+                {"message": "User with this email does not exist."},
+            status.HTTP_404_NOT_FOUND
+            )
+
+
+common_responses = {
+    200: SuccessResponseSerializer,
+    201: SuccessResponseSerializer,
+    400: ErrorResponseSerializer,
+    401: ErrorResponseSerializer,
+    403: ErrorResponseSerializer,
+    404: ErrorResponseSerializer,
+    500: ErrorResponseSerializer,
+}
+
+
+@extend_schema(tags=["Profiles"])
+class ProfileViewSet(BaseResponseMixin, viewsets.ViewSet):
+    """
+    ViewSet for managing authenticated user's profile.
+    """
     permission_classes = [permissions.IsAuthenticated]
-    
-    def get_queryset(self):
-        """Return only the user's profile"""
-        user = self.request.user
-        return Profile.objects.filter(user=user)
-    
-    @action(detail=False, methods=['get'])
+
+    def get_object(self):
+        return Profile.objects.get(user=self.request.user)
+
+    @extend_schema(
+        responses={**common_responses, 200: ProfileSerializer},
+        description="Retrieve the current authenticated user's profile."
+    )
+    @action(detail=False, methods=['get'], url_path='me')
     def me(self, request):
-        """Get current user profile"""
-        profile = Profile.objects.get(user=request.user)
-        serializer = self.get_serializer(profile)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['put', 'patch'])
+        """
+        Get the current authenticated user's profile.
+        """
+        profile = self.get_object()
+        serializer = ProfileSerializer(profile)
+        return self.success(serializer.data)
+
+    @extend_schema(
+        request=ProfileSerializer,
+        responses={**common_responses, 200: ProfileSerializer},
+        description="Update the current authenticated user's profile."
+    )
+    @action(detail=False, methods=['put', 'patch'], url_path='update-me')
     def update_me(self, request):
-        """Update current user profile"""
-        profile = Profile.objects.get(user=request.user)
-        serializer = self.get_serializer(profile, data=request.data, partial=True)
+        """
+        Update the current authenticated user's profile.
+        """
+        profile = self.get_object()
+        serializer = ProfileSerializer(profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(serializer.data)
+        return self.success(serializer.data)
+
+
