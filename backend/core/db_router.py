@@ -7,7 +7,7 @@ class MultiDBRouter:
     - MongoDB is handled separately via pymongo, not through Django ORM.
     """
 
-    postgresql_apps = {'auth', 'admin', 'contenttypes', 'sessions', 'users', 'jobs', 'resumes'}
+    postgresql_apps = {'auth', 'admin', 'contenttypes', 'sessions', 'users', 'jobs', 'resumes', 'companies'}
     mysql_apps = {'analytics'}
 
     def db_for_read(self, model, **hints):

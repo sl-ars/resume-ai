@@ -65,3 +65,4 @@ backend/.env.docker
 # OS
 .DS_Store
 Thumbs.db
+.next/

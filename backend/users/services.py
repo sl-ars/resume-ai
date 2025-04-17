@@ -50,7 +50,7 @@ class PasswordResetService:
         token_data = cls.generate_token(user)
         
         # Generate password reset link
-        # In production, use request.build_absolute_uri() to generate proper URLs
+
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
         reset_url = f"{frontend_url}/reset-password/{token_data['uid']}/{token_data['token']}"
         

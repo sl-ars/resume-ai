@@ -6,7 +6,7 @@ from drf_spectacular.utils import extend_schema, OpenApiRequest
 from jobs.models import Job, Application
 from resumes.models import Resume
 from resumes.mongo.storage import get_resume_content_by_resume_id
-from jobs.serializers import JobSerializer, ApplicationSerializer
+from jobs.serializers import JobSerializer, ApplicationSerializer, JobDetailSerializer, ResumeMatchRequestSerializer
 from jobs.services.matching_service import MatchingService
 
 from core.mixins.response import BaseResponseMixin
@@ -38,12 +38,21 @@ class JobViewSet(BaseResponseMixin, viewsets.ModelViewSet):
     serializer_class = JobSerializer
     queryset = Job.objects.all()
 
+
+
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return JobDetailSerializer
+        return JobSerializer
+
     def get_queryset(self):
         user = self.request.user
         if user.is_admin:
             return Job.objects.all()
-        elif user.is_recruiter:
-            return Job.objects.filter(user=user)
+
+        if user.is_recruiter:
+            return Job.objects.filter(company__recruiters=user)
         return Job.objects.filter(status=Job.Status.APPROVED)
 
     def perform_create(self, serializer):
@@ -114,19 +123,13 @@ class JobViewSet(BaseResponseMixin, viewsets.ModelViewSet):
         return self.success({"detail": "Application submitted."}, status.HTTP_201_CREATED)
 
     @extend_schema(
-        request=OpenApiRequest({
-            "application/json": {
-                "type": "object",
-                "properties": {
-                    "resume_id": {"type": "string", "format": "uuid"}
-                },
-                "required": ["resume_id"]
-            }
-        }),
-        responses={200: SuccessResponseSerializer, 400: ErrorResponseSerializer, 403: ErrorResponseSerializer, 404: ErrorResponseSerializer},
+        request=ResumeMatchRequestSerializer,
+        responses={200: SuccessResponseSerializer, 400: ErrorResponseSerializer, 403: ErrorResponseSerializer,
+                   404: ErrorResponseSerializer},
         description="Recruiter or admin matches a resume to a job."
     )
     @action(detail=True, methods=['post'], url_path='match')
+
     def match_resume(self, request, pk=None):
         if not (request.user.is_recruiter or request.user.is_admin):
             return self.error("Only recruiters/admins can match resumes.", status.HTTP_403_FORBIDDEN)
@@ -135,7 +138,8 @@ class JobViewSet(BaseResponseMixin, viewsets.ModelViewSet):
         resume_id = request.data.get('resume_id')
 
         try:
-            resume_id = str(UUID(resume_id))
+            resume_id = str(resume_id)
+
             resume_doc = get_resume_content_by_resume_id(resume_id)
         except ValueError:
             return self.error("Invalid resume_id format.", status.HTTP_400_BAD_REQUEST)
@@ -207,8 +211,9 @@ class ApplicationViewSet(BaseResponseMixin, viewsets.ModelViewSet):
         user = self.request.user
         if user.is_admin:
             return Application.objects.all()
-        elif user.is_recruiter:
-            return Application.objects.filter(job__user=user)
+        if user.is_recruiter:
+            return Application.objects.filter(job__company__recruiters=user)
+
         return Application.objects.filter(applicant=user)
 
     @extend_schema(

@@ -46,7 +46,7 @@ class User(AbstractUser):
         RECRUITER = 'recruiter', _('Recruiter')
         ADMIN = 'admin', _('Admin')
     
-    username = None  # Remove username field
+    username = None
     email = models.EmailField(_('email address'), unique=True)
     role = models.CharField(
         max_length=20,

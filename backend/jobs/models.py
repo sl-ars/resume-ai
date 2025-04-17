@@ -4,7 +4,7 @@ from django.conf import settings
 
 class Job(models.Model):
     """
-    Job listing posted by recruiters.
+    Job listing tied to a company. Created by recruiters.
     """
     class Status(models.TextChoices):
         DRAFT = 'draft', 'Draft'
@@ -13,14 +13,17 @@ class Job(models.Model):
         REJECTED = 'rejected', 'Rejected'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+    company = models.ForeignKey(
+        'companies.Company',
         on_delete=models.CASCADE,
         related_name='jobs'
     )
     title = models.CharField(max_length=255)
     description = models.TextField()
     skills_required = models.JSONField(default=list)
+
+    location = models.CharField(max_length=255, blank=True, null=True)
+    is_remote = models.BooleanField(default=False)
 
     status = models.CharField(
         max_length=20,
@@ -35,7 +38,7 @@ class Job(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return self.title
+        return f"{self.title} at {self.company.name}"
 
 
 class Application(models.Model):
@@ -58,7 +61,7 @@ class Application(models.Model):
         on_delete=models.CASCADE,
         related_name='applications'
     )
-    is_approved = models.BooleanField(default=False)  # <<< NEW FIELD
+    is_approved = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
