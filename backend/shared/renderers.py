@@ -18,10 +18,10 @@ class CustomJSONRenderer(JSONRenderer):
         # Get response status code
         status_code = renderer_context.get('response').status_code if renderer_context else 200
         
-        # Determine if response is successful based on status code
+
         is_success = 200 <= status_code < 300
         
-        # Check if the data already has our custom format
+
         if isinstance(data, dict) and all(k in data for k in ['success', 'data', 'error']):
             return super().render(data, accepted_media_type, renderer_context)
         

@@ -1,54 +1,101 @@
-# React + TypeScript + Vite
+# Resume AI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Resume AI is a web application that helps users upload, parse, analyze, and optimize their resumes using AI technology.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- User authentication with JWT
+- Resume upload (PDF/DOCX)
+- Resume parsing and content extraction
+- AI-powered resume analysis
+- User profile management
+- Admin dashboard for user management and system logs
 
-## Expanding the ESLint configuration
+## Tech Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Frontend**: Next.js, React, TypeScript, Tailwind CSS
+- **UI Components**: shadcn/ui
+- **State Management**: React Context API
+- **HTTP Client**: Axios
+- **Authentication**: JWT (Access & Refresh Tokens)
+- **Styling**: Tailwind CSS
+- **Icons**: Lucide React
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+## Getting Started
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Prerequisites
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- Node.js 18.x or higher
+- npm or yarn
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
-```
+### Installation
+
+1. Clone the repository:
+   \`\`\`bash
+   git clone https://github.com/yourusername/resume-ai.git
+   cd resume-ai
+   \`\`\`
+
+2. Install dependencies:
+   \`\`\`bash
+   npm install
+   \`\`\`
+
+3. Create a `.env.local` file based on `.env.example`:
+   \`\`\`bash
+   cp .env.example .env.local
+   \`\`\`
+
+4. Update the environment variables in `.env.local` with your configuration.
+
+5. Start the development server:
+   \`\`\`bash
+   npm run dev
+   \`\`\`
+
+6. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Environment Variables
+
+- `NEXT_PUBLIC_API_URL`: URL of the backend API
+- `NEXT_PUBLIC_AUTH_ENABLED`: Enable/disable authentication (true/false)
+- `NEXT_PUBLIC_ENABLE_ADMIN_FEATURES`: Enable/disable admin features (true/false)
+
+## Docker
+
+You can also run the application using Docker:
+
+\`\`\`bash
+docker-compose up -d
+\`\`\`
+
+## API Endpoints
+
+The application interacts with the following API endpoints:
+
+### Authentication
+- `POST /api/auth/register/` - Register user
+- `POST /api/auth/token/` - Obtain access and refresh tokens
+- `POST /api/auth/token/refresh/` - Refresh access token
+
+### User Profile
+- `GET /api/profiles/me/` - Get current user's profile
+- `PUT/PATCH /api/profiles/update_me/` - Update current user's profile
+
+### Resumes
+- `POST /api/resumes/upload/` - Upload a resume file
+- `GET /api/resumes/` - List my uploaded resumes
+- `GET /api/resumes/{resume_id}/content/` - Get parsed resume content
+- `POST /api/resumes/{resume_id}/parse/` - Parse resume file
+- `POST /api/resumes/{resume_id}/analyze/` - Analyze parsed resume
+
+### Admin Endpoints (Optional)
+- `GET /api/users/` - List users (Admin)
+- `GET /api/users/{id}/` - Retrieve user by ID (Admin)
+- `PATCH /api/users/{id}/` - Partially update user (Admin)
+- `DELETE /api/users/{id}/` - Delete user (Admin)
+- `GET /api/analytics/logs/` - View system logs (Admin)
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

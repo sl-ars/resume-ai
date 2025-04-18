@@ -1,6 +1,6 @@
 from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import action
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
 from users.models import User, Profile
@@ -36,6 +36,11 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 @extend_schema(tags=["Auth"])
 class CustomTokenRefreshView(TokenRefreshView):
+    pass
+
+
+@extend_schema(tags=["Auth"])
+class CustomTokenVerifyView(TokenVerifyView):
     pass
 
 

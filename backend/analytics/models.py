@@ -14,9 +14,9 @@ class LogEntry(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     timestamp = models.DateTimeField(auto_now_add=True)
 
-    user_id = models.IntegerField(null=True, blank=True)  # <<< INT
-    object_type = models.CharField(max_length=50)  # E.g., "resume", "job", "application", "user"
-    object_id = models.UUIDField(null=True, blank=True)  # UUID of resume, job, etc.
+    user_id = models.IntegerField(null=True, blank=True)
+    object_type = models.CharField(max_length=50)
+    object_id = models.UUIDField(null=True, blank=True)
     action = models.CharField(max_length=20, choices=ActionType.choices)
     message = models.TextField()
 

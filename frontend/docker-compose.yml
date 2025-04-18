@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  resume-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api.resumeai.example.com
+      - NEXT_PUBLIC_AUTH_ENABLED=true
+      - NEXT_PUBLIC_ENABLE_ADMIN_FEATURES=true
+    restart: unless-stopped

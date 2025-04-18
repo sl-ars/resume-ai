@@ -53,3 +53,17 @@ class ResumeContentSerializer(serializers.Serializer):
     raw_text = serializers.CharField(allow_blank=True, required=False)
     created_at = serializers.DateTimeField(required=False)
     updated_at = serializers.DateTimeField(required=False)
+
+
+class ResumeSerializer(serializers.ModelSerializer):
+    """
+    Full serializer for Resume (used for creation and update).
+    """
+
+    class Meta:
+        model = Resume
+        fields = [
+            'id', 'title', 'file', 'file_type', 'status',
+            'visibility', 'original_filename', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'file_type', 'status', 'original_filename', 'created_at', 'updated_at']
